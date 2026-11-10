@@ -50,7 +50,7 @@ cp .env.example .env.local   # then set ANTHROPIC_API_KEY in .env.local
 
 The assistant uses **Claude Opus 5.5** at low effort, which keeps support answers fast and short. Each message is billed to your Anthropic account, so leave the key unset if you just want to explore. The chat header says **"Demo mode"** whenever you're on the free answers.
 
-The assistant allows 20 messages per visitor and 300 overall every 10 minutes. On Vercel, visitors are told apart by their IP automatically; if you self-host behind a proxy that sets `X-Real-IP`, set `TRUST_PROXY_IP_HEADER=true`.
+The assistant allows 300 messages overall every 10 minutes, plus 20 per visitor when it can tell visitors apart: automatically on Vercel, or when you self-host behind a proxy that sets `X-Real-IP` and set `TRUST_PROXY_IP_HEADER=true`.
 
 ## 🧰 Scripts
 

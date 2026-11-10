@@ -24,18 +24,21 @@ const headers = (mode: "demo" | "ai") => ({
 });
 
 export async function POST(req: Request) {
-  // Only trust the client-IP header where something we control sets it: Vercel always overwrites x-real-ip,
-  // and self-hosters can opt in when their reverse proxy does. Otherwise everyone shares one strict bucket.
-  // The global cap bounds total spend no matter what.
-  const trustIpHeader = process.env.VERCEL === "1" || process.env.TRUST_PROXY_IP_HEADER === "true";
-  const ip = (trustIpHeader && req.headers.get("x-real-ip")) || "untrusted";
-  if (isRateLimited([[`ip:${ip}`, 20], ["global", 300]])) {
-    return new Response("Too many messages. Please wait a few minutes and try again.", { status: 429 });
-  }
-
+  // Validate first so malformed requests never use up anyone's rate-limit budget.
   const messages = parseChatRequest(await req.json().catch(() => null));
   if (!messages) {
     return new Response("Invalid chat request.", { status: 400 });
+  }
+
+  // Per-visitor limits need a client IP we can trust: Vercel always overwrites x-real-ip, and self-hosters
+  // can opt in when their reverse proxy sets it. Without one, only the global cap applies, which bounds
+  // total spend no matter what (a shared per-IP bucket would let one visitor lock everyone out).
+  const trustIpHeader = process.env.VERCEL === "1" || process.env.TRUST_PROXY_IP_HEADER === "true";
+  const ip = trustIpHeader ? req.headers.get("x-real-ip") : null;
+  const buckets: [string, number][] = [["global", 300]];
+  if (ip) buckets.unshift([`ip:${ip}`, 20]);
+  if (isRateLimited(buckets)) {
+    return new Response("Too many messages. Please wait a few minutes and try again.", { status: 429 });
   }
 
   // Free demo mode unless a key is configured, so the app never spends money by accident.
