@@ -24,8 +24,10 @@ const headers = (mode: "demo" | "ai") => ({
 });
 
 export async function POST(req: Request) {
-  const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "local";
-  if (isRateLimited(ip)) {
+  // x-real-ip is set by the hosting platform (e.g. Vercel overwrites any client value). When self-hosting,
+  // set it at your reverse proxy. The global cap bounds total spend even if per-IP keys are spoofed.
+  const ip = req.headers.get("x-real-ip") ?? "unknown";
+  if (isRateLimited(`ip:${ip}`) || isRateLimited("global", 300)) {
     return new Response("Too many messages. Please wait a few minutes and try again.", { status: 429 });
   }
 

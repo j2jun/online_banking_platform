@@ -45,13 +45,19 @@ export function demoReply(question: string): string {
     "I can help with balances, transfers, lost or stolen cards, fees, and signing in. Could you rephrase your question around one of those? For anything account-specific, please contact support.";
 }
 
-// ponytail: in-memory per-IP limiter, resets on restart and isn't shared across server
-// instances; move to a shared store (e.g. Redis, Vercel Firewall rate limiting) before production.
+// ponytail: in-memory limiter, resets on restart and isn't shared across server instances;
+// move to a shared store (e.g. Redis, Vercel Firewall rate limiting) before production.
 const hits = new Map<string, number[]>();
+const MAX_TRACKED_KEYS = 10_000;
 
+/** Sliding-window limit per key. Memory stays bounded: stale and least-recently-seen keys are dropped. */
 export function isRateLimited(key: string, limit = 20, windowMs = 10 * 60_000, now = Date.now()) {
   const recent = (hits.get(key) ?? []).filter((t) => now - t < windowMs);
   recent.push(now);
+  hits.delete(key); // re-insert so Map order tracks recency
   hits.set(key, recent);
+  if (hits.size > MAX_TRACKED_KEYS) hits.delete(hits.keys().next().value!); // evict the least recently seen
   return recent.length > limit;
 }
+
+export const trackedKeyCount = () => hits.size;

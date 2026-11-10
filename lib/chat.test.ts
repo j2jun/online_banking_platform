@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { MAX_CHARS, MAX_MESSAGES, demoReply, isRateLimited, parseChatRequest } from "./chat.ts";
+import { MAX_CHARS, MAX_MESSAGES, demoReply, isRateLimited, parseChatRequest, trackedKeyCount } from "./chat.ts";
 
 const user = (content: string) => ({ role: "user", content });
 const bot = (content: string) => ({ role: "assistant", content });
@@ -47,4 +47,9 @@ test("isRateLimited allows the limit, then blocks until the window passes", () =
   assert.equal(isRateLimited("ip-a", 3, 1000, t + 3), true);
   assert.equal(isRateLimited("ip-b", 3, 1000, t + 3), false); // per key
   assert.equal(isRateLimited("ip-a", 3, 1000, t + 5000), false); // window expired
+});
+
+test("isRateLimited keeps memory bounded when flooded with unique keys", () => {
+  for (let i = 0; i < 12_000; i++) isRateLimited(`flood-${i}`, 20, 1000, 2_000_000);
+  assert.ok(trackedKeyCount() <= 10_000);
 });
