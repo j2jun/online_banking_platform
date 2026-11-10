@@ -1,8 +1,8 @@
-/* eslint-disable no-unused-vars */
 
+// Next 15+: params and searchParams are Promises; await them in the page.
 declare type SearchParamProps = {
-  params: { [key: string]: string };
-  searchParams: { [key: string]: string | string[] | undefined };
+  params: Promise<{ [key: string]: string }>;
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 };
 
 // ========================================
@@ -193,7 +193,7 @@ declare interface AuthFormProps {
 
 declare interface BankDropdownProps {
   accounts: Account[];
-  setValue?: UseFormSetValue<any>;
+  setValue?: (name: string, value: string) => void;
   otherStyles?: string;
 }
 
