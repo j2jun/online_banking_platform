@@ -121,7 +121,7 @@ export function getAccountTypeColors(type: AccountTypes) {
 
     default:
       return {
-        bg: "bg-green-25",
+        bg: "bg-green-50",
         lightBg: "bg-green-100",
         title: "text-green-900",
         subText: "text-green-700",
