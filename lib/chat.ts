@@ -50,14 +50,21 @@ export function demoReply(question: string): string {
 const hits = new Map<string, number[]>();
 const MAX_TRACKED_KEYS = 10_000;
 
-/** Sliding-window limit per key. Memory stays bounded: stale and least-recently-seen keys are dropped. */
-export function isRateLimited(key: string, limit = 20, windowMs = 10 * 60_000, now = Date.now()) {
-  const recent = (hits.get(key) ?? []).filter((t) => now - t < windowMs);
-  recent.push(now);
-  hits.delete(key); // re-insert so Map order tracks recency
-  hits.set(key, recent);
-  if (hits.size > MAX_TRACKED_KEYS) hits.delete(hits.keys().next().value!); // evict the least recently seen
-  return recent.length > limit;
+/**
+ * Sliding-window limits across several buckets (e.g. per-IP and global). Checks every bucket first and
+ * records the request only if all allow it, so rejected requests never use up anyone's budget.
+ * Memory stays bounded: least-recently-seen keys are evicted past MAX_TRACKED_KEYS.
+ */
+export function isRateLimited(buckets: [key: string, limit: number][], windowMs = 10 * 60_000, now = Date.now()) {
+  const windows = buckets.map(([key]) => (hits.get(key) ?? []).filter((t) => now - t < windowMs));
+  if (buckets.some(([, limit], i) => windows[i].length >= limit)) return true;
+
+  buckets.forEach(([key], i) => {
+    hits.delete(key); // re-insert so Map order tracks recency
+    hits.set(key, [...windows[i], now]);
+  });
+  while (hits.size > MAX_TRACKED_KEYS) hits.delete(hits.keys().next().value!);
+  return false;
 }
 
 export const trackedKeyCount = () => hits.size;

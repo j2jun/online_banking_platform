@@ -43,13 +43,24 @@ test("demoReply matches common banking questions and has a fallback", () => {
 
 test("isRateLimited allows the limit, then blocks until the window passes", () => {
   const t = 1_000_000;
-  for (let i = 0; i < 3; i++) assert.equal(isRateLimited("ip-a", 3, 1000, t + i), false);
-  assert.equal(isRateLimited("ip-a", 3, 1000, t + 3), true);
-  assert.equal(isRateLimited("ip-b", 3, 1000, t + 3), false); // per key
-  assert.equal(isRateLimited("ip-a", 3, 1000, t + 5000), false); // window expired
+  const a: [string, number][] = [["ip-a", 3]];
+  for (let i = 0; i < 3; i++) assert.equal(isRateLimited(a, 1000, t + i), false);
+  assert.equal(isRateLimited(a, 1000, t + 3), true);
+  assert.equal(isRateLimited([["ip-b", 3]], 1000, t + 3), false); // per key
+  assert.equal(isRateLimited(a, 1000, t + 5000), false); // window expired
+});
+
+test("rejected requests don't use up the global budget", () => {
+  const t = 3_000_000;
+  const spam = (): [string, number][] => [["ip:spammer", 2], ["global:test", 5]];
+  for (let i = 0; i < 50; i++) isRateLimited(spam(), 1000, t + i); // 2 allowed, 48 rejected
+  for (let i = 0; i < 3; i++) {
+    assert.equal(isRateLimited([[`ip:user-${i}`, 2], ["global:test", 5]], 1000, t + 100), false);
+  }
+  assert.equal(isRateLimited([["ip:user-9", 2], ["global:test", 5]], 1000, t + 100), true); // 5 real uses
 });
 
 test("isRateLimited keeps memory bounded when flooded with unique keys", () => {
-  for (let i = 0; i < 12_000; i++) isRateLimited(`flood-${i}`, 20, 1000, 2_000_000);
+  for (let i = 0; i < 12_000; i++) isRateLimited([[`flood-${i}`, 20]], 1000, 2_000_000);
   assert.ok(trackedKeyCount() <= 10_000);
 });

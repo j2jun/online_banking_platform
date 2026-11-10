@@ -24,10 +24,12 @@ const headers = (mode: "demo" | "ai") => ({
 });
 
 export async function POST(req: Request) {
-  // x-real-ip is set by the hosting platform (e.g. Vercel overwrites any client value). When self-hosting,
-  // set it at your reverse proxy. The global cap bounds total spend even if per-IP keys are spoofed.
-  const ip = req.headers.get("x-real-ip") ?? "unknown";
-  if (isRateLimited(`ip:${ip}`) || isRateLimited("global", 300)) {
+  // Only trust the client-IP header where something we control sets it: Vercel always overwrites x-real-ip,
+  // and self-hosters can opt in when their reverse proxy does. Otherwise everyone shares one strict bucket.
+  // The global cap bounds total spend no matter what.
+  const trustIpHeader = process.env.VERCEL === "1" || process.env.TRUST_PROXY_IP_HEADER === "true";
+  const ip = (trustIpHeader && req.headers.get("x-real-ip")) || "untrusted";
+  if (isRateLimited([[`ip:${ip}`, 20], ["global", 300]])) {
     return new Response("Too many messages. Please wait a few minutes and try again.", { status: 429 });
   }
 
