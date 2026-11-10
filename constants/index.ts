@@ -97,8 +97,8 @@ export const transactionCategoryStyles = {
   Success: {
     borderColor: "border-[#12B76A]",
     backgroundColor: "bg-[#12B76A]",
-    textColor: "text-[#027A48]",
-    chipBackgroundColor: "bg-[#ECFDF3]",
+    textColor: "text-success-700",
+    chipBackgroundColor: "bg-success-50",
   },
   default: {
     borderColor: "",

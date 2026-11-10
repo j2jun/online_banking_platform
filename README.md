@@ -1,6 +1,6 @@
 # Horizon (banking_app)
 
-A banking dashboard built with Next.js 14 (App Router), Tailwind CSS, shadcn/ui, and Chart.js.
+A banking dashboard built with Next.js 16 (App Router, Turbopack), React 19, Tailwind CSS 4, and Chart.js.
 
 ## Status
 
@@ -11,17 +11,23 @@ A banking dashboard built with Next.js 14 (App Router), Tailwind CSS, shadcn/ui,
 
 ## Run
 
+Requires Node.js 20.9 or newer.
+
 ```bash
 npm install
-npm run dev     # http://localhost:3000
-npm run build   # typecheck + lint + production build
+npm run dev         # http://localhost:3000
+npm run build       # production build (includes a typecheck)
+npm run lint        # ESLint (flat config in eslint.config.mjs)
+npm run typecheck   # tsc --noEmit
+npm test            # unit tests for lib/ (node:test, no extra deps)
 ```
 
 ## Layout
 
 - `app/`: routes. `(root)` is the signed-in area, `(auth)` holds sign-in and sign-up.
-- `components/`: UI components (`components/ui` is managed by shadcn).
-- `lib/utils.ts`: formatting and helper functions.
+- `components/`: UI components. Add shadcn/ui components with `npx shadcn@latest add <name>`.
+- `lib/utils.ts`: formatting and helper functions, tested in `lib/utils.test.ts`.
+- `app/globals.css`: Tailwind 4 config lives here (`@theme` for colors and fonts, `@utility` for custom classes); there is no `tailwind.config` file.
 - `constants/`: sidebar links and category styles.
 - `types/index.d.ts`: global types.
 
