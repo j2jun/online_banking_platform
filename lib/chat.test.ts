@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { MAX_CHARS, MAX_MESSAGES, demoReply, isRateLimited, parseChatRequest, trackedKeyCount } from "./chat.ts";
+import { MAX_CHARS, MAX_MESSAGES, demoReply, isRateLimited, parseChatRequest, readBodyLimited, trackedKeyCount } from "./chat.ts";
 
 const user = (content: string) => ({ role: "user", content });
 const bot = (content: string) => ({ role: "assistant", content });
@@ -63,4 +63,13 @@ test("rejected requests don't use up the global budget", () => {
 test("isRateLimited keeps memory bounded when flooded with unique keys", () => {
   for (let i = 0; i < 12_000; i++) isRateLimited([[`flood-${i}`, 20]], 1000, 2_000_000);
   assert.ok(trackedKeyCount() <= 10_000);
+});
+
+test("readBodyLimited reads small bodies and rejects oversized ones, even without Content-Length", async () => {
+  const post = (body: BodyInit) => new Request("http://x/", { method: "POST", body });
+  assert.equal(await readBodyLimited(post('{"a":1}')), '{"a":1}');
+  assert.equal(await readBodyLimited(post("x".repeat(101)), 100), null);
+  const chunked = new ReadableStream({ start(c) { for (let i = 0; i < 5; i++) c.enqueue(new Uint8Array(40)); c.close(); } });
+  const streamed = new Request("http://x/", { method: "POST", body: chunked, duplex: "half" } as RequestInit);
+  assert.equal(await readBodyLimited(streamed, 100), null);
 });

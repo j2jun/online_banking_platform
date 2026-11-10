@@ -1,6 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 
-import { demoReply, isRateLimited, parseChatRequest } from "@/lib/chat";
+import { demoReply, isRateLimited, parseChatRequest, readBodyLimited } from "@/lib/chat";
 
 // Kept byte-for-byte stable so it can be prompt-cached once it grows past the minimum cacheable size.
 const SYSTEM_PROMPT = `You are Horizon Assistant, the customer support assistant for Horizon, a consumer banking app.
@@ -24,8 +24,18 @@ const headers = (mode: "demo" | "ai") => ({
 });
 
 export async function POST(req: Request) {
-  // Validate first so malformed requests never use up anyone's rate-limit budget.
-  const messages = parseChatRequest(await req.json().catch(() => null));
+  // Validate first (with a bounded read) so malformed or oversized requests never use up rate-limit budget.
+  const raw = await readBodyLimited(req);
+  if (raw === null) {
+    return new Response("Request too large.", { status: 413 });
+  }
+  let parsed: unknown = null;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    // fall through to the 400 below
+  }
+  const messages = parseChatRequest(parsed);
   if (!messages) {
     return new Response("Invalid chat request.", { status: 400 });
   }
@@ -33,6 +43,7 @@ export async function POST(req: Request) {
   // Per-visitor limits need a client IP we can trust: Vercel always overwrites x-real-ip, and self-hosters
   // can opt in when their reverse proxy sets it. Without one, only the global cap applies, which bounds
   // total spend no matter what (a shared per-IP bucket would let one visitor lock everyone out).
+  // For a hard dollar ceiling, also set a spend limit on the API key's workspace in the Claude Console.
   const trustIpHeader = process.env.VERCEL === "1" || process.env.TRUST_PROXY_IP_HEADER === "true";
   const ip = trustIpHeader ? req.headers.get("x-real-ip") : null;
   const buckets: [string, number][] = [["global", 300]];
@@ -49,7 +60,7 @@ export async function POST(req: Request) {
   const stream = client.beta.messages.stream(
     {
       model: "claude-opus-5-5",
-      max_tokens: 4096,
+      max_tokens: 1024, // support answers are a few sentences; also caps worst-case cost per message
       output_config: { effort: "low" }, // short support answers don't need deep reasoning
       betas: ["server-side-fallback-2026-07-01"],
       fallbacks: "default", // if the model declines, the API retries on a fallback model

@@ -5,6 +5,25 @@ export type ChatMessage = { role: "user" | "assistant"; content: string };
 
 export const MAX_MESSAGES = 20;
 export const MAX_CHARS = 1000;
+export const MAX_BODY_BYTES = 64_000; // a full valid chat (20 x 1000 chars) is far smaller
+
+/** Reads a request body as text, giving up (null) past maxBytes so oversized uploads can't exhaust memory. */
+export async function readBodyLimited(req: Request, maxBytes = MAX_BODY_BYTES): Promise<string | null> {
+  if (Number(req.headers.get("content-length") ?? 0) > maxBytes) return null;
+  if (!req.body) return "";
+  const reader = req.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  for (let r = await reader.read(); !r.done; r = await reader.read()) {
+    size += r.value.byteLength;
+    if (size > maxBytes) {
+      await reader.cancel();
+      return null;
+    }
+    chunks.push(r.value);
+  }
+  return new TextDecoder().decode(Buffer.concat(chunks));
+}
 
 /** Returns the conversation if it is well-formed, otherwise null. Never trust the client. */
 export function parseChatRequest(body: unknown): ChatMessage[] | null {
